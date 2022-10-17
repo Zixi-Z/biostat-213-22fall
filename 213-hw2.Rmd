@@ -1,0 +1,131 @@
+---
+title: "Biostat 213 Homework 2"
+author: "Zixi Zhang"
+date: "2022-10-15"
+output:
+  pdf_document: default
+  html_document: default
+---
+<!-- Setup -->
+<style type="text/css">
+body{ /* Normal  */
+      font-size: 17px;
+      font-family: "Times New Roman";
+  }
+h1,h2,h3,h4,h5,h6{
+  font-family: "Times New Roman";
+}
+</style>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+library(grid)
+```
+
+
+**Assignment**
+
+Use the accept-reject algorithm to simulate a Gamma distribution
+
+
+
+Make sure you set your seed so you can reproduce your results.
+
+**Gamma Distribution**
+
+Probability Density Function:
+
+for $\alpha, \beta >0$ and $x > 0$:
+
+$$
+f(x) = \frac{\beta^\alpha x^{\alpha-1} \exp(-\beta x)}{\Gamma(\alpha)}
+$$
+
+where $\Gamma(\alpha)$ is the gamma function:
+
+$$
+\Gamma(x) = \begin{cases}
+  (x-1)!, \text{ if } x \text{ is a positive integer}\\
+  \int_0^\infty s^{x-1}\exp(-s) \ ds, \text{ for } x>0
+\end{cases}
+$$
+
+
+
+## Accept-Reject Method to Simulate Gamma Random Variables
+Harder:
+Since it is fairly simple to simulate a Gamma($\alpha, \beta$) density when $\alpha$ is an integer. It would be useful to use this with the accept-reject method to simulate a more general Gamma distribution; for example, when $\alpha$ is not an integer. 
+
+#Hint: To do this, we need to figure out if a ratio of two Gamma probability distributions have an upper bound.
+
+```{r}
+rgamma.ar <- function(n, shape, scale = 1) {
+  s <- shape
+  s.int <- floor(s)
+  b <- s / s.int
+  M <-
+    gamma(s.int) / gamma(s) * b ** s.int * (s * exp(-1)) ** (s - s.int)
+  f <- function(y)
+    dgamma(y, shape = s)
+  Mg <- function(y)
+    M * dgamma(y, shape = s.int, rate = 1 / b)
+  acpt <- 0
+  total <- 0
+  X <- numeric(n)
+  while (acpt < n) {
+    total <- total + 1
+    Y <- sum(-b * log(runif(s.int)))
+    if (runif(1) <= f(Y) / Mg(Y)) {
+      acpt <- acpt + 1
+      X[acpt] <- Y
+    }
+  }
+  return(list(
+    X = scale * X,
+    theoretical_rate = 1 / M,
+    observed_rate = acpt / total
+  ))
+}
+```
+
+
+```{r}
+#set shape = 5.5, rate = 1
+set.seed(2016)
+o <- rgamma.ar(1000, shape = 5.5)
+#get acceptance probability
+o[-1]
+```
+
+
+```{r}
+# create list to hold our two plots
+plts <- list()
+
+# construct histogram of generated values
+plts[[1]] <- tibble(sim = o$X) %>%
+  ggplot() + geom_density(aes(x = sim)) + labs(x = "x", y = "Frequency", title =
+                                                 "Generated Gamma density") +
+  xlim(0, 18) + ylim( c(0, 0.2)) + theme_bw()
+
+# get the exact values of the PDF
+gam <- dgamma(seq(0, 18, 0.1), 5.5, rate = 1)
+# construct line chart of exact pdf
+plts[[2]] <- tibble(x = seq(0, 18, 0.1), pdf = gam) %>%
+  ggplot() + geom_line(aes(x = x, y = pdf)) + labs(x = "x", y = "f(x)", title =
+                                                     "Exact Gamma density") + 
+  xlim(0, 18) + ylim(c(0, 0.2)) + theme_bw()
+
+#arrange two plots
+grid.arrange(grobs = plts, nrow = 1)
+```
+
+
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
