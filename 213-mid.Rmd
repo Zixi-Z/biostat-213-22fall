@@ -1,0 +1,394 @@
+---
+title: "213 Mid Tellers"
+author: "Zixi Zhang"
+date: "2022-11-09"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1)  Conduct a simulation on your Urgent Care Center business. Here are
+    some simplifying assumptions.
+
+Assume that your business opens at 8am and closes at 5pm. Customers
+arrive at a rate of 4/hr. Between the hours of noon and 1 that rate
+increases to 6/hr. Suppose you have 2 tellers. There are, in general, 3
+types of queuing systems 1) 1 line with parallel servers. 2) tandem
+service (In-N-out example) and 3) where each teller has their own line
+(grocery store).
+
+What is the expected waiting time for each type of system. Simulate 1
+week (do 7 times and take the average). Which system do you think is the
+best? Does it matter where you place the "slow" teller? Does you
+"optimal" depend on your choices?
+
+### Setting up Function
+
+```{r}
+lambda.t <- function(time) {
+    # rate increases to 6/hr between the hours of noon and 1
+    if (time >= 4 & time <= 5) {
+      lambda <- 6	
+    # Customers arrive at a rate of 4/hr  in less busy time
+    } else {
+      lambda <- 4   
+    }
+    list(lamt = lambda)
+}
+
+inter_arrival_time <- function(n = 1,t =0){
+  u <- runif(n)
+  x <- -log(u) / lambda.t(t)$lamt
+  x
+}
+```
+
+Simulating an exponential random variable with parameter lambda:
+```{r}
+expsim <- function(n = 1 , lambda = 1){
+  u <- runif(n)
+  x <- -log(u) / lambda
+  x
+}
+```
+
+
+medium: all servers have different rates. Note that tandem should be different 
+than the other 2 (think about why in-n-out has tandem service)
+
+### One line two parallel servers
+
+Server 1 ~ serves 5 customers per hour (12 minutes per customer)
+
+Server 2 ~ serves 3 customers per hour (20 minutes per customer)
+
+```{r}
+#reset Time past T and waiting time
+Tp <- -1
+meanminwait <- -1
+
+set.seed(159)
+
+for (i in 1:7) {
+  t <- 0 # time
+  Na <- 0 # total number of arrivals at time t
+  Nd <- 0 # total number of departures at time t
+  i1 <- 0 # customer being served by server 1
+  i2 <- 0 # customer being served by server 2
+  c1 <- 0 # total number of customers that are served by server 1
+  c2 <- 0 # total number of customers that are served by server 2
+  n <- 0 # number of customers in store at time t
+  A <- 0 # vector of arrival times of each customer
+  D <- 0 # vector of departure times of each customer
+  Tp[i] <- -1 # time past closing that the last customer departs
+  ta <- expsim(lambda = 4)# time of first arrival
+  t1 <- 99999 # time of next departure from server 1
+  t2 <- 99999 # time of next departure from server 2
+  
+  while (Tp[i] == -1) {
+    # arrival occurs before a departure occurs
+    if (ta == min(ta, t1, t2) & (ta < 9) ) {
+      t <- ta
+      Na <- Na + 1
+      X <- inter_arrival_time(t = ta) # generating next inter-arrival time
+      ta <- X + t # setting next arrival time
+      A[Na] <- t # recording the time of the current arrival
+      if (n == 0 | (n == 1 & i1 == 0)) {
+        n <- n + 1
+        i1 <- Na
+        Y1 <- expsim(lambda = 5) # generating service time
+        t1  <- t + Y1 # generating next departure time
+      } else if (n == 1 & i2 == 0) {
+        n <- n + 1
+        i2 <- Na
+        Y2 <- expsim(lambda = 3)
+        t2 <- t + Y2
+      } else if (n >= 2) {
+        n <- n + 1
+      }
+    
+    # someone departs from server 1
+    } else if ((t1 < ta & t1 <= t2) | (ta > 9 & t1 <= t2 & n>0)) {
+      t <- t1
+      c1 <- c1 + 1
+      Nd <- Nd + 1
+      D[i1] <- t
+      if (n == 1){
+        n <- 0
+        i1 <- 0
+        t1 <- 99999
+      } else if (n==2) {
+        n <- n - 1
+        i1 <- 0
+        t1 <- 99999
+      } else if (n > 2) {
+        n <- n - 1
+        i1 <- max(i1, i2) + 1
+        Y1 <- expsim(lambda = 5)
+        t1 <- t + Y1
+      }
+    # someone departs from server 2
+    } else if ((t2 < ta & t2 < t1) | (ta > 9 & t1 > t2 & n > 0)) {
+      t <- t2
+      c2 <- c2 + 1
+      Nd <- Nd + 1
+      D[i2] <- t
+      if (n == 1 | n == 2){
+        n <- n-1
+        i2 <- 0
+        t2 <- 99999
+      } else if (n > 2) {
+        n <- n - 1
+        i2 <- max(i1, i2) + 1
+        Y2 <- expsim(lambda = 3)
+        t2 <- t + Y2
+      } 
+    } else if (n == 0 & ta > 9){
+      Tp[i] <- (max(D) - 9)*60
+    }
+    }
+  wait <- D - A
+  meanminwait[i] <- mean(wait)*60
+}
+
+Tp[Tp<0] <- 0
+
+```
+
+```{r}
+result1 <- list(mean(meanminwait),mean(Tp))
+names(result1) <- c("Average waiting time of a customer",
+"The average time past T last customer leaves TP")
+print(result1)
+```
+The average waiting time of a customer is 17.22 minutes, and the average time of 
+last customer leaving the store is 16.90 minutes after closing.
+
+
+### Two servers in tandem
+
+In the one line two parallel servers system, there was one server that took 
+about 12 minutes per customer, and another server that took about 20 minutes per
+customer. So on average, the service time took about 16 minutes per customer.
+
+Here, set the first server’s service time to be about 7.5 minutes per customer 
+(can serve 8 customers per hour). Also set the second server’s service time to 
+be about 8.5 minutes per customer (can serve about 7 customers per hour). 
+This means that on average the total service time will be about 16 minutes which 
+is similar to what it took in the previous two server case.
+
+Server 1 ~ serves 8 customers per hour (7.5minutes per customer)
+
+Server 2 ~ serves about 7 customers per hour (8.5 minutes per customer)
+
+```{r}
+Tp <- -1
+meanminwait <- -1
+set.seed(357)
+# run simulation for a week
+for (i in 1:7) {
+  # setting initial values
+  A1 <- 0 # vector of arrival times to server 1
+  A2 <- 0 # vector of arrival times to server 2
+  t <- 0 # current time
+  t1 <- 99999 # departure time from server 1
+  t2 <- 99999 # departure time from server 2
+  n1 <- 0 # number of people in line at server 1
+  n2 <- 0 # number of people in line at server 2
+  D <- 0 # departure time vector
+  Na <- 0 # total number of arrivals
+  Nd <- 0 # total number of departures
+  ta <- expsim(lambda = 4) # first arrival time
+  Tp[i] <- -1 # will be the time after closing the last customer leaves
+
+# condition while loop to run until last person leaves
+  while (Tp[i] == -1) {
+    # someone arrives before closing 
+    if (ta == min(ta, t1, t2) & ( ta<9)) {
+      t <- ta # update time to current arrival time
+      n1 <- n1 + 1 # update number of people in line for server 1
+      Na <- Na + 1 # update total number of arrivals
+      X <- inter_arrival_time(t = ta)
+      ta <- t + X # next arrival time
+      A1[Na] <- t # record arrival time
+      if (n1 == 1) {
+        Y1 <- expsim(lambda=8)
+        t1 <- t + Y1 # next departure time from server 1
+      }
+    # someone departs from server 1 and goes to server 2 line
+    } else if((t1 < ta & t1 <= t2) | (ta > 9 & n1 > 0)) {
+      t <- t1
+      n1 <- n1 - 1
+      n2 <- n2 + 1
+      A2[Na - n1] <- t
+      if (n1 == 0) {
+        t1 <- 99999
+      } else {
+        Y1 <- expsim(lambda = 8)
+        t1 <- t + Y1
+      }
+      if (n2 == 1) {
+        Y2 <- expsim(lambda = 7) 
+        t2 <- t + Y2
+      }
+    # someone leaves from server 2 (leaves store)
+    } else if (t2 < ta & t2 < t1 | (ta > 9 & t2 < t1)) {
+      t <- t2
+      Nd <- Nd + 1
+      n2 <- n2 - 1
+      D[Nd] <- t
+      if (n2 == 0) {
+        t2 <- 99999
+      } else if (n2 > 0) {
+        Y2 <- expsim(lambda = 7)
+        t2 <- t + Y2
+      }
+    # if no one is in the store and it's after closing, record time of last departure
+    } else if (ta > 9 & (n1+n2) == 0) {
+      Tp[i] <- (max(D) - 9)*60
+    }
+  }
+  # wait times for each customer (in hours):
+  wait <- D - A1
+  # mean wait times in minutes for each customer for day i
+  meanminwait[i] <- mean(wait)*60
+}
+
+Tp[Tp<0] <- 0
+
+```
+
+```{r}
+result2 <- list(mean(meanminwait),mean(Tp))
+names(result2) <- c("Average waiting time of a customer","The average time past T last customer leaves TP")
+print(result2)
+```
+The average waiting time of a customer is 24.63 minutes, and the average time of 
+last customer leaving the store is 17.91 minutes after closing.
+
+### Each server has their own line
+Assume that the person comes into the store will choose that line that is 
+shorter, and if the lines are the same length will default to choosing line 1.
+
+Server 1 ~ serves 5 customers per hour (12 minutes per customer)
+
+Server 2 ~ serves 3 customers per hour (20 minutes per customer)
+
+Same as one line two parallel servers system
+
+```{r}
+Tp <- -1
+meanminwait <- -1
+set.seed(304)
+# run simulation for a week
+for (i in 1:7) {
+  # initial values
+  n1 <- 0 # number of people in line 1
+  n2 <- 0 # number of people in line 2
+  A1 <- 0 # vector of times of arrivals to line 1
+  A2 <- 0 # vector of times of arrivals to line 2
+  D1 <- 0 # vector of times of departures from line 1
+  D2 <- 0 # vector of times of departures from line 2
+  Na1 <- 0 # total number of arrivals to line 1
+  Na2 <- 0 # total number of arrivals to line 2
+  Nd1 <- 0 # total number of departures from line 1
+  Nd2 <- 0 # total number of departures from line 2
+  t <- 0 # current time
+  t1 <- 99999 # time of next departure from line 1
+  t2 <- 99999 # time of next departure from line 2
+  ta <- expsim(lambda = 4) # time of first arrival 
+  Tp[i] <- -1
+  
+  while (Tp[i] == -1) {
+    # arrival while line 1 is shorter 
+    if (n1 <= n2 & ta < min(t1, t2) & (ta < 9)) {
+      t <- ta
+      n1 <- n1 + 1
+      X <- inter_arrival_time(t = ta)
+      ta <- t + X
+      Na1 <- Na1 + 1
+      A1[Na1] <- t
+      if (n1 == 1) {
+        Y1 <- expsim(lambda = 5)
+        t1 <- t + Y1
+      }
+    # arrival while line 2 is shorter 
+    } else if (n2 < n1 & ta < min(t1, t2) & (ta < 9)) {
+      t <- ta
+      n2 <- n2 + 1
+      X <- inter_arrival_time(t = ta)
+      ta <- t + X
+      Na2 <- Na2 + 1
+      A2[Na2] <- t
+      if (n2 == 1){
+        Y2 <- expsim(lambda = 3)
+        t2 <- t + Y2
+      }
+
+    # arrival while line 2 is shorter during busy time
+    } else if (n2 < n1 & ta < min(t1, t2) & ta >= 4 & ta <= 5) {
+      t <- ta
+      n2 <- n2 + 1
+      X <- expsim(lambda = 6)
+      ta <- t + X
+      Na2 <- Na2 + 1
+      A2[Na2] <- t
+      if (n2 == 1){
+        Y2 <- expsim(lambda = 3)
+        t2 <- t + Y2
+      }
+    # departure from line 1
+    } else if ((t1 < ta & t1 <= t2) | (ta > 9 & t1 <= t2 & (n1 + n2) > 0)) {
+      t <- t1
+      n1 <- n1 - 1
+      Nd1 <- Nd1 + 1
+      D1[Nd1] <- t
+      if (n1 > 0) {
+        Y1 <- expsim(lambda = 5)
+        t1 <- t + Y1
+      } else if (n1 == 0) {
+        t1 <- 99999
+      }
+    # departure from line 2
+    } else if ((t2 < ta & t2 < t1) | (ta > 9 & t2 < t1 & (n1 + n2) > 0))  {
+      t <- t2
+      n2 <- n2 - 1
+      Nd2 <- Nd2 + 1
+      D2[Nd2] <- t
+      if (n2 > 0){
+        Y2 <- expsim(lambda = 3)
+        t2 <- t + Y2
+      } else if (n2 == 0) {
+        t2 = 99999
+      }
+    } else if (ta > 9 & (n1 + n2) == 0) {
+      Tp[i] <- (max(D1, D2) - 9)*60
+      wait <- c(D1 - A1, D2 - A2)
+      meanminwait[i] <- mean(wait)*60
+    }
+  }
+}
+
+Tp[Tp<0] <- 0
+```
+
+```{r}
+result3 <- list(mean(meanminwait),mean(Tp))
+names(result3) <- c("Average waiting time of a customer","The average time past T last customer leaves TP")
+print(result3)
+```
+The average waiting time of a customer is 20.86 minutes, and the average time of 
+last customer leaving the store is 17.43 minutes after closing.
+
+
+### Conclusion
+```{r}
+do.call(c, list(result1,result2,result3))
+```
+We can see the one line two parallel servers system has the shortest average 
+waiting time of 17.22 minutes and the last customer leaves at an average time of 
+16.90 minutes after closing(which is also the shortest among the three systems).
