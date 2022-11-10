@@ -1,5 +1,5 @@
 ---
-title: "213 Mid Tellers"
+title: "213 Mid Two Tellers"
 author: "Zixi Zhang"
 date: "2022-11-09"
 output:
@@ -10,7 +10,6 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
 ## 1)  Conduct a simulation on your Urgent Care Center business. 
 
 Here are some simplifying assumptions:
@@ -48,7 +47,8 @@ inter_arrival_time <- function(n = 1,t =0){
 }
 ```
 
-Simulating an exponential random variable with parameter lambda:
+
+Simulating an exponential random variable with parameter lambda to generate service completion time:
 ```{r}
 expsim <- function(n = 1 , lambda = 1){
   u <- runif(n)
@@ -56,7 +56,6 @@ expsim <- function(n = 1 , lambda = 1){
   x
 }
 ```
-
 
 medium: all servers have different rates. Note that tandem should be different 
 than the other 2 (think about why in-n-out has tandem service)
@@ -491,7 +490,6 @@ do.call(c, list(result1,result4))
 For parallel system, placing the slower teller as server1 increases the average
 waiting time and average time that last customer leaves after closing.
 
-
 ### Two servers in tandem
 
 Server 1 ~ serves 6 customers per hour (10 minutes per customer) 
@@ -588,7 +586,6 @@ of average time that the last customer leaves after closing is significant.
 Server 2 ~ serves 3 customers per hour (20 minutes per customer)
 
 Server 1 ~ serves 5 customers per hour (12 minutes per customer)
-
 
 ```{r}
 Tp <- -1
