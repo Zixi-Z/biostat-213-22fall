@@ -583,9 +583,9 @@ of average time that the last customer leaves after closing is significant.
 
 ### Each server has their own line
 
-Server 2 ~ serves 3 customers per hour (20 minutes per customer)
+Server 1 ~ serves 3 customers per hour (20 minutes per customer)
 
-Server 1 ~ serves 5 customers per hour (12 minutes per customer)
+Server 2 ~ serves 5 customers per hour (12 minutes per customer)
 
 ```{r}
 Tp <- -1
