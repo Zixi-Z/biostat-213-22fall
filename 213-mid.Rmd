@@ -387,9 +387,9 @@ waiting time of 17.22 minutes and the last customer leaves at an average time of
 
 ### One line two parallel servers
 
-Server 1 ~ serves 5 customers per hour (12 minutes per customer)
+Server 1 ~ serves 3 customers per hour (20 minutes per customer)
 
-Server 2 ~ serves 3 customers per hour (20 minutes per customer)
+Server 2 ~ serves 5 customers per hour (12 minutes per customer)
 
 ```{r}
 #reset Time past T and waiting time
