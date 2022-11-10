@@ -85,7 +85,7 @@ for (i in 1:7) {
   A <- 0 # vector of arrival times of each customer
   D <- 0 # vector of departure times of each customer
   Tp[i] <- -1 # time past closing that the last customer departs
-  ta <- expsim(lambda = 4)# time of first arrival
+  ta <- inter_arrival_time(t = 0)# time of first arrival
   t1 <- 99999 # time of next departure from server 1
   t2 <- 99999 # time of next departure from server 2
   
@@ -161,8 +161,8 @@ Tp[Tp<0] <- 0
 
 ```{r}
 result1 <- list(mean(meanminwait),mean(Tp))
-names(result1) <- c("Average waiting time of a customer",
-"The average time past T last customer leaves TP")
+names(result1) <- c("Parallel: Average waiting time of a customer of parr",
+"Parallel: The average time past T last customer leaves TP")
 print(result1)
 ```
 The average waiting time of a customer is 17.22 minutes, and the average time of 
@@ -202,7 +202,7 @@ for (i in 1:7) {
   D <- 0 # departure time vector
   Na <- 0 # total number of arrivals
   Nd <- 0 # total number of departures
-  ta <- expsim(lambda = 4) # first arrival time
+  ta <- inter_arrival_time(t = 0) # first arrival time
   Tp[i] <- -1 # will be the time after closing the last customer leaves
 
 # condition while loop to run until last person leaves
@@ -264,7 +264,8 @@ Tp[Tp<0] <- 0
 
 ```{r}
 result2 <- list(mean(meanminwait),mean(Tp))
-names(result2) <- c("Average waiting time of a customer","The average time past T last customer leaves TP")
+names(result2) <- c("Tandem: Average waiting time of a customer",
+                    "Tandem: The average time past T last customer leaves TP")
 print(result2)
 ```
 The average waiting time of a customer is 24.63 minutes, and the average time of 
@@ -300,7 +301,7 @@ for (i in 1:7) {
   t <- 0 # current time
   t1 <- 99999 # time of next departure from line 1
   t2 <- 99999 # time of next departure from line 2
-  ta <- expsim(lambda = 4) # time of first arrival 
+  ta <- inter_arrival_time(t = 0) # time of first arrival 
   Tp[i] <- -1
   
   while (Tp[i] == -1) {
@@ -378,7 +379,8 @@ Tp[Tp<0] <- 0
 
 ```{r}
 result3 <- list(mean(meanminwait),mean(Tp))
-names(result3) <- c("Average waiting time of a customer","The average time past T last customer leaves TP")
+names(result3) <- c("Grocery store: Average waiting time of a customer",
+                    "Grocery store: The average time past T last customer leaves TP")
 print(result3)
 ```
 The average waiting time of a customer is 20.86 minutes, and the average time of 
