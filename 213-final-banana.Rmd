@@ -1,0 +1,246 @@
+---
+title: "213 Final Project"
+author: "Zixi Zhang"
+date: "2022-12-08"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(adaptMCMC)
+library(coda)
+library(ggplot2)
+library(dplyr)
+library(latex2exp)
+library(bayesplot)
+library(gridExtra)
+library(grid)
+```
+
+## Introduction
+
+The two dimensional Banana distribution (Haario, 1999) is defined as:
+
+$$
+\pi (x_1, x_2) \propto e^{\frac{-x_1^2}{2}} e^{\frac{-(x_2 - 2(x_1^2 - 5))^2}{2}};x_1,x_2 \in \mathrm{R}
+$$
+
+In this project, sample points($x_1$,$x_2$) following the above distribution are generated using Markov chain Monte Carlo (MCMC) methods. Two methods are used here: Metropolis-Hasting algorithm and Gibbs sampling. Samples are generated for different proposal jump sizes(w = 0.5, w = 1.0, w = 2.0), and mixing and convergence are compared.
+
+## Methods and Results
+
+### Metropolis algorithm
+Metropolis Sampler is conducted by using function `MCMC` from Package `adaptMCMC`. This function is an implementation of the robust adaptive Metropolis sampler of Vihola (2012). Classic (non-adaptive) Metropolis sampling can be obtained by setting `adapt=FALSE`. To use `MCMC` function, our original probability density is converted to the log probability density: 
+$\frac{-x_1^2}{2}-\frac{(x_2 - 2(x_1^2 - 5))^2}{2}$.
+
+```{r}
+## set log-pdf
+p.log <- function(x) {
+  -x[1]^2/2 - 1/2*(x[2]-2*x[1]^2+10)^2
+}
+## sample for w = 0.5
+set.seed(1997)
+N <- 10000
+Metrosample1 <- MCMC(p.log, n = N, init = c(0, 0), 
+                scale = c(0.5, 0.5), adapt=FALSE)
+Metrosample1.coda <-  convert.to.coda(Metrosample1)
+cumuplot(Metrosample1.coda)
+```
+
+Produce scatterplot of $x_1$ VS. $x_2$ and superimpose the path of the chain for the first 200 iterations when $w = 0.5$.
+```{r}
+df1 <- as.data.frame(Metrosample1$samples)
+ggplot() + geom_point(data = df1, aes(x = V1, y = V2), col = 7) +
+  geom_path(data = df1[0:200,], aes(x = V1, y = V2)) +
+  labs(
+    x = TeX(r'($x_1$)'),
+    y = TeX(r'($x_2$)'),
+    title = TeX(
+      r'(Scatterplot with path for Metropolis sampling with $w = 0.5$)'
+    )
+  ) +
+  theme_bw() +
+  theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(colour = "black")
+  )
+```
+
+### Gibbs sampling
+By converting $e^{\frac{-x_1^2}{2}}$ to the form $e^{-\frac{1}{2}\frac{(x_1-0)^2}{1}}$, we can find $x_1$ follows a standard normal distribution. Similarly, $e^{\frac{-(x_2 - 2(x_1^2 - 5))^2}{2}}$ can be converted to $e^{-\frac{1}{2}\frac{(x_2 - 2(x_1^2 - 5))^2}{1}}$, which follows a normal distribution density with $\mu = 2(x_1^2 - 5)$ and $\sigma =1$.
+
+```{r}
+# set Gibbs
+gibbs <- function (n, w) {
+  x1 <- vector("numeric", n)
+  x2 <- vector("numeric", n)
+  for (i in 2:n) {
+    x1[i] <- rnorm(1, 0, w)
+    x2[i] <- rnorm(1, 2 * (x1[i]^2 - 5), 1)
+  }
+  cbind(x1, x2)
+}
+# generate N = 10000 sample from Gibbs sampling
+Gibbssample1 <- gibbs(n = N, w =  0.5)
+Gibbssample1.coda <- as.mcmc(Gibbssample1)
+cumuplot(Gibbssample1.coda)
+```
+
+Produce scatterplot of $x_1$ VS. $x_2$ and superimpose the path of the chain for the first 200 iterations when $w = 0.5$.
+```{r}
+df2 <- as.data.frame(Gibbssample1)
+ggplot() + geom_point(data = df2, aes(x = x1, y = x2), col = 7) +
+  geom_path(data = df2[0:200,], aes(x = x1, y = x2)) +
+  labs(
+    x = TeX(r'($x_1$)'),
+    y = TeX(r'($x_2$)'),
+    title = TeX(
+      r'(Scatterplot with path for Gibbs sampling with $w = 0.5$)'
+    )
+  ) +
+  theme_bw() +
+  theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(colour = "black")
+  )
+```
+
+### Mixing Diagostic
+
+#### Metropolis algorithm sample
+
+First generate samples for $w = 1.0$ and $w = 2.0$. For all the three samples, we set first 5000 sample as burn in samples. Typically, initial samples are not completely valid because the Markov Chain has not stabilized to the stationary distribution. The burn in samples allow us to discard these initial samples that are not yet at the stationary.
+
+```{r}
+# sample for w = 1.0
+Metrosample2 <- MCMC(p.log, n = N, init = c(0, 0), scale = c(1, 1),
+               adapt=FALSE)
+# sample for w = 2.0
+Metrosample3 <- MCMC(p.log, n = N, init = c(0, 0), scale = c(2, 2),
+               adapt=FALSE)
+## convert to MCMC object
+Metrosample2.coda <- convert.to.coda(Metrosample2)
+Metrosample3.coda <- convert.to.coda(Metrosample3)
+## discard burn-in samples
+burnin = 5000
+Metrosample1.discarded <- mcmc(Metrosample1.coda[burnin:N, ])
+Metrosample2.discarded <- mcmc(Metrosample2.coda[burnin:N, ])
+Metrosample3.discarded <- mcmc(Metrosample3.coda[burnin:N, ])
+```
+Plot the autocorrelation function for each variable in each chain
+
+```{r}
+p1 <- autocorr.plot(Metrosample1.discarded)
+p2 <- autocorr.plot(Metrosample2.discarded)
+p3 <- autocorr.plot(Metrosample3.discarded)
+```
+
+For $x_1$, all three samples' autocorrelations tend to decrease quickly as the lag increases. But for $x_2$, $w=0.5$ and $w = 1.0$ show that the autocorrelations do not decrease quickly. This indicates a mixing.
+
+### Gibbs Sampling sample
+```{r}
+Gibbssample2 <- gibbs(N, 1.0)
+Gibbssample3 <- gibbs(N, 2.0)
+Gibbssample2.coda <- as.mcmc(Gibbssample2)
+Gibbssample3.coda <- as.mcmc(Gibbssample3)
+Gibbssample1.discarded <- mcmc(Gibbssample1.coda[burn:N, ])
+Gibbssample2.discarded <- mcmc(Gibbssample2.coda[burn:N, ])
+Gibbssample3.discarded <- mcmc(Gibbssample3.coda[burn:N, ])
+```
+
+Plot the autocorrelation function for each variable in each chain
+
+```{r}
+autocorr.plot(Gibbssample1.discarded)
+autocorr.plot(Gibbssample2.discarded)
+autocorr.plot(Gibbssample3.discarded)
+```
+
+For Gibbs Sampling, both $x_1$ and $x_2$ show a dramatically decrease in Auctocorrelation after lag 0. This indicates the chain explores all regions of the stationary distribution.
+
+
+
+
+### Convergence Diagostic
+
+#### Geweke Diagostic
+
+The Geweke diagnostic takes two nonoverlapping parts (usually the first 0.1 and last 0.5 proportions) of the Markov chain and compares the means of both parts, using a difference of means test to see if the two parts of the chain are from the same distribution(null hypothesis).
+The test statistic is a standard Z-score with the standard errors adjusted for autocorrelation.
+
+
+```{r}
+# Metropolis algorithm sample
+geweke.diag(Metrosample1.discarded, frac1 = 0.1, frac2 = 0.5)
+geweke.diag(Metrosample2.discarded, frac1 = 0.1, frac2 = 0.5)
+geweke.diag(Metrosample3.discarded, frac1 = 0.1, frac2 = 0.5)
+```
+
+```{r}
+# Gibbs sample
+geweke.diag(Gibbssample1.discarded, frac1 = 0.1, frac2 = 0.5)
+geweke.diag(Gibbssample2.discarded, frac1 = 0.1, frac2 = 0.5)
+geweke.diag(Gibbssample3.discarded, frac1 = 0.1, frac2 = 0.5)
+```
+ For both two methods, all the samples have a Z-score less than 2. This indicates they all converge to a stationary distribution.
+
+
+#### Heidelberg and Welch Diagnostic
+
+The Heidelberg and Welch diagnostic calculates a test statistic (based on the Cramer-von Mises test statistic) to accept or reject
+the null hypothesis that the Markov chain is from a stationary distribution.
+
+```{r}
+# Metropolis sample
+heidel.diag(Metrosample1.discarded)
+heidel.diag(Metrosample2.discarded)
+heidel.diag(Metrosample3.discarded)
+```
+
+```{r}
+# Gibbs sample
+heidel.diag(Gibbssample1.discarded)
+heidel.diag(Gibbssample2.discarded)
+heidel.diag(Gibbssample3.discarded)
+```
+
+For both two methods, all the samples failed the Heidelberg and Welch test. This indicates that the chains have not reached their stationary distribution.
+
+
+#### Raftery and Lewis Diagnostic
+
+1. Select a posterior quantile of interest q = 0.025  quantile.
+2. Select an acceptable tolerance r = 0.005 for this quantile i.e., we want to measure the 0.025 quantile with an accuracy of ± 0.005.
+3. Select a probability s = 0.95, which is the desired probability of being within (q-r, q+r).
+4. Run a “pilot” sampler to generate a Markov chain of minimum length given by rounding up
+$$
+n_{\min }=\left[\Phi^{-1}\left(\frac{s+1}{2}\right) \frac{\sqrt{q(1-q)}}{r}\right]^2
+$$
+where $\Phi^{-1}(\cdot)$ is the inverse of the normal CDF.
+
+```{r}
+# Metropolis sample
+raftery.diag(Metrosample1.discarded, q = 0.025, r = 0.005, s = 0.95)
+raftery.diag(Metrosample2.discarded, q = 0.025, r = 0.005, s = 0.95)
+raftery.diag(Metrosample3.discarded, q = 0.025, r = 0.005, s = 0.95)
+```
+
+```{r}
+# Gibbs 
+raftery.diag(Gibbssample1.discarded, q = 0.025, r = 0.005, s = 0.95)
+raftery.diag(Gibbssample2.discarded, q = 0.025, r = 0.005, s = 0.95)
+raftery.diag(Gibbssample3.discarded, q = 0.025, r = 0.005, s = 0.95)
+```
+
+For samples using Metropolis algorithm, all three samples have worrisome high dependence factor (> 5), which may be due to  influential starting values, high correlations between coefficients, or poor mixing.
+For samples using Gibbs sampling, all three samples have good dependence factor (< 5).
+
+## Conclusion
+
+In general, comparing all the Mixing and Convergence Diagnostics and scatterplots, Gibbs sampling method tends to have a better performance. However, in general cases, Gibbs sampler is slower than the Metropolis algorithm.
