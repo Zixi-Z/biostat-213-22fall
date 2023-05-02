@@ -1,0 +1,214 @@
+---
+title: "Final_banana"
+author: "Zixi Zhang"
+date: "2022-11-15"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(adaptMCMC)
+library(coda)
+```
+
+### INTRODUCTION
+
+The two dimensional Banana distribution (Haario, 1999) is defined as:
+
+$$
+\pi (x_1, x_2) \propto e^{\frac{-x_1^2}{2}} e^{\frac{-(x_2 - 2(x_1^2 - 5))^2}{2}};x_1,x_2 \in \mathrm{R}
+$$
+
+In this project, sample point `(x, y)` will be drawn from the above distribution based on the principles of Markov Chain Monte Carlo. We conducted the sampling via Gibbs sampling method and Metropolis algorithm with the help of the `adaptMCMC` R package at three different jump size,`w = 0.5, 1, and 2`. Diagnostics for convergence include Geweke test, Raftery-Lewis test, Heidelberger-Welsch test, and examining plots.
+
+### METHODS
+
+Using the function `MCMC` from package `adaptMCMC`, samples were drawn from the log density of the banana distribution: $\frac{-x_1^2}{2} - \frac{(x_2 - 2(x_1^2 - 5))^2}{2}$ via Metropolis algorithm (`MCMC` function with option `adapt = FALSE`). Metropolis algorithm uses a proposal distribution for sampling. The proposal distribution allows sampling from the target distribution when it is too complex to directly sample from.
+
+Gibbs sampling was carried out by recognizing that $e^{\frac{-x_1^2}{2}}$ has the form of normal probability density function with mean 0 and standard deviation 1 and $e^{\frac{-(x_2 - 2(x_1^2 - 5))^2}{2}}$ has the form of normal probability density function with mean $2(x_1^2 - 5)$ and standard deviation 1. Thus, $x_1$ is drawn from a standard normal and $x_2$ is drawn from a normal distribution conditional on $x_1$ with mean $2(x_1^2 - 5)$ and standard deviation 1.
+
+Convergence of the sample to the targeted banana distribution was checked with Geweke test, Raftery-Lewis test, and Heidelberger-Welsch test. The functions for these tests are from the `coda` R package.
+
+Mixing diagnosis was done by examining the autocorrelation plot. The autocorrelation plot was produced with the `autocorr.plot` from the `coda` package.
+
+### RESULTS
+
+10000 sample points were generated using the `MCMC` function with variance `w = 0.5` (sample 1). 10000 sample were also drawn with variance `w = 1.0` (sample 2), and another 10000 variance `w = 2.0` (sample 3). Histogram for $x_1$ matches closely with that of a standard normal (mean = 0, standard deviation = 1). Histogram for $x_2$ shows a right skewed distribution.
+
+For all 3 samples at 3 different `w`, the first 5000 sample points were discarded as burn-in. The remaining sample were assessed for convergence and mixing.
+
+Mixing: For $x_1$, autocorrelation decreases to below 0.5 with increasing lag for all three sample. Autocorrelation for $x_2$ also decreases but more slowly and remain above 0.5 for samples with `w = 1` and `w = 2`. This indicates slow mixing for the Markov Chains.
+
+Convergence:
+
+-   Geweke diagnostic (comparing means between the first 0.1 and last 0.5 portions of the chain): z-scores for all three samples are less than 2. Three samples appear to converge to a stationary distribution under Geweke test.
+  
+-   Raftery-Lewis diagnostic: all three samples have high dependence factor (\> 5), which indicate there may be high correlations between variables or poor mixing.
+
+-   Heidelberger-Welch diagnostic: all three samples failed the halfwidth test. This indicates that the chains have not reached their stationary distribution and needs to be run longer.
+
+Sampling could also be done with Gibbs Sampling method. For multidimensional distributions that are too complex, we can evaluate the conditional distributions $p(x_i | x_{j \neq i})$ and sample from the individual conditional distributions. In many cases, these one-dimensional conditional distributions are easier to work with and can be sampled from exactly. However, a drawback of Gibbs Sampling is that when variables are strongly correlated, the Markov Chain tends to be stuck in one area.
+
+Results from implementing Gibbs sampling show that autocorrelation decrease significantly and quickly with increasing lag; the autocorrelation is almost 0 after the first sample point for both $x_1$ and $x_2$. This indicates the chain explores all regions of the stationary distribution. The samples passed the Geweke diagnostic (z-score \< 2 for $x_1$ and $x_2$), but failed the halfwidth test of the Heidelberger-Welch diagnostic. Again, longer run is needed.
+
+At `w = 0.5`, the time series plot for $x_2$ looks a lot more stable for the Gibbs sample than the sample obtained from `MCMC` function.
+
+### CONCLUSION
+
+Sample points generated using the `MCMC` function from the `adaptMCMC` package show a banana shaped distribution on point plot but the Markov chains did not perform well in diagnostics. Although samples from Gibbs sampling failed the halfwidth test of Heidelberger-Welch diagnostic, the samples show marked decrease in autocorrelation, therefore the chains from Gibbs sampling mixed much better than the chains from `MCMC` function.
+
+### CODES
+
+### Sampling with MCMC function
+
+```{r}
+## log-pdf to sample from
+p.log <- function(x) {
+  -x[1]^2/2 - 1/2*(x[2]-2*x[1]^2+10)^2
+}
+## generate sample
+set.seed(1997)
+N <- 10000
+sample1 <- MCMC(p.log, n = N, init = c(0, 0), 
+                scale = c(0.5, 0.5), adapt=FALSE)
+sample1.mcmc = mcmc(sample1$samples)
+```
+
+
+
+```{r}
+str(sample1$samples)
+summary(sample1$samples)
+```
+
+
+
+
+
+```{r}
+summary(sample1.mcmc)
+plot(sample1.mcmc)
+```
+
+-   Path of the first 200 sample points:
+
+```{r}
+library(latex2exp)
+plot(sample1$samples, xlim = c(-5, 5), ylim = c(-15, 15), col = 7,xlab = TeX(r'($x_1$)'),,ylab = TeX(r'($x_2$)'))
+lines(sample1$samples[0:1000, ])
+```
+
+-   Diagnostic
+
+```{r}
+## More samples with different variance
+## jumpsize w = 1
+sample2 <- MCMC(p.log, n = N, init = c(0, 0), scale = c(1, 1),
+               adapt=FALSE)
+## jumpsize w = 2
+sample3 <- MCMC(p.log, n = N, init = c(0, 0), scale = c(2, 2),
+               adapt=FALSE)
+## getting (x, y) from samples
+sample1.mcmc <- sample1$samples
+sample2.mcmc <- sample2$samples
+sample3.mcmc <- sample3$samples
+## discard burn-in, N = number iterations
+burn <- 5000
+sample1.burned <- mcmc(sample1.mcmc[burn:N, ])
+sample2.burned <- mcmc(sample2.mcmc[burn:N, ]) 
+sample3.burned <- mcmc(sample3.mcmc[burn:N, ]) 
+# plot(ts(sample1$samples))
+# plot(ts(sample2$samples))
+# plot(ts(sample3$samples))
+```
+
+```{r}
+autocorr.plot(sample1.burned)
+```
+
+```{r}
+autocorr.plot(sample2.burned)
+```
+
+```{r}
+autocorr.plot(sample3.burned)
+```
+
+-   Geweke test (if Geweke z-score is \> 2, not at stationary distribution yet):
+
+```{r}
+## geweke z-score
+geweke.diag(sample1.burned , frac1 = 0.1, frac2 = 0.5)
+geweke.diag(sample2.burned , frac1 = 0.1, frac2 = 0.5)
+geweke.diag(sample3.burned , frac1 = 0.1, frac2 = 0.5)
+```
+
+-   Raftery-Lewis test:
+
+```{r}
+raftery.diag(sample1.burned, q = 0.025, r = 0.005, s = 0.95, converge.eps = 0.001)
+raftery.diag(sample2.burned, q = 0.025, r = 0.005, s = 0.95, converge.eps = 0.001)
+raftery.diag(sample3.burned, q = 0.025, r = 0.005, s = 0.95, converge.eps = 0.001)
+```
+
+-   Heidelberg & Welch test:
+
+```{r}
+heidel.diag(sample1.burned, eps = 0.1, pvalue = 0.05)
+heidel.diag(sample2.burned, eps = 0.1, pvalue = 0.05)
+heidel.diag(sample3.burned, eps = 0.1, pvalue = 0.05)
+```
+
+### Gibbs Sampling from normal distributions
+
+```{r}
+# Gibbs function
+gibbs.bnn<-function (n, rho) {
+  x1 <- vector("numeric", n)
+  x2 <- vector("numeric", n)
+  
+  for (i in 2:n) {
+    x1[i] <- rnorm(1, 0, rho)
+    x2[i] <- rnorm(1, 2 * (x1[i]^2 - 5), 1)
+  }
+  cbind(x1, x2)
+}
+```
+
+```{r}
+# plots from Gibbs sampling
+bnn1<-gibbs.bnn(N,0.5)
+plot(as.mcmc(bnn1))
+```
+
+-   Gibbs sampling - path of the first 200 points:
+
+```{r}
+plot(bnn1, xlim = c(-5, 5), ylim = c(-15, 15), col = 7)
+lines(bnn1[0:1000, ])
+```
+
+-   Gibbs sampling comparisons with w = 1 and w = 2
+
+```{r}
+bnn2<-gibbs.bnn(N,1)
+bnn3<-gibbs.bnn(N,2)
+# discard burn-in from Gibbs sampling
+bnn1.burned <- as.mcmc(bnn1[burn:N, ])
+bnn2.burned <- as.mcmc(bnn2[burn:N, ])
+bnn3.burned <- as.mcmc(bnn3[burn:N, ])
+# diagnostics for Gibbs sample
+autocorr.plot(bnn1.burned)
+# geweke
+geweke.diag(bnn1.burned, frac1 = 0.1, frac2 = 0.5)
+geweke.diag(bnn2.burned, frac1 = 0.1, frac2 = 0.5)
+geweke.diag(bnn3.burned, frac1 = 0.1, frac2 = 0.5)
+# raftery-lewis
+raftery.diag(bnn1.burned, q = 0.025, r = 0.005, s = 0.95, converge.eps = 0.001)
+raftery.diag(bnn2.burned, q = 0.025, r = 0.005, s = 0.95, converge.eps = 0.001)
+raftery.diag(bnn3.burned, q = 0.025, r = 0.005, s = 0.95, converge.eps = 0.001)
+# heidelberger-welch
+heidel.diag(bnn1.burned, eps = 0.1, pvalue = 0.05)
+heidel.diag(bnn2.burned, eps = 0.1, pvalue = 0.05)
+heidel.diag(bnn3.burned, eps = 0.1, pvalue = 0.05)
+```
